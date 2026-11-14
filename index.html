@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lakásrend">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#e9eff0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d181b" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Napi 15 perc lakásrend</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one phone-width column. Today's job and its timer on top, the week underneath. */
+:root {
+  --bg: #e9eff0;
+  --surface: #ffffff;
+  --ink: #12262b;
+  --muted: #566b71;
+  --line: #d3dddf;
+  --accent: #f2b705;
+  --accent-ink: #1d1600;
+  --done: #17754c;
+  --done-soft: #dcefe5;
+  --font-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d181b;
+    --surface: #15262a;
+    --ink: #e7eff0;
+    --muted: #93a8ad;
+    --line: #263b40;
+    --accent: #f5c22b;
+    --accent-ink: #1d1600;
+    --done: #56c890;
+    --done-soft: #173a2b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d181b;
+  --surface: #15262a;
+  --ink: #e7eff0;
+  --muted: #93a8ad;
+  --line: #263b40;
+  --accent: #f5c22b;
+  --accent-ink: #1d1600;
+  --done: #56c890;
+  --done-soft: #173a2b;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+}
+main {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: calc(24px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.date {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+h1 {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.streak {
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 8px 12px;
+  text-align: right;
+}
+.streak b {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.streak span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.timer {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 18px;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.timer-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.clock {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 64px;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.timer-note {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: right;
+  max-width: 14ch;
+}
+.bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(29, 22, 0, 0.18);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--accent-ink);
+}
+.timer-actions {
+  display: flex;
+  gap: 8px;
+}
+button {
+  font: inherit;
+  font-weight: 600;
+  border-radius: 12px;
+  min-height: 46px;
+  padding: 0 16px;
+  cursor: pointer;
+}
+.btn-main {
+  flex: 1;
+  border: 0;
+  background: var(--accent-ink);
+  color: #fff6d6;
+}
+.btn-quiet {
+  border: 1.5px solid var(--accent-ink);
+  background: transparent;
+  color: var(--accent-ink);
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+.timer button:focus-visible { outline-color: var(--accent-ink); }
+
+section h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.list li + li { border-top: 1px solid var(--line); }
+.list label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.list input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--done);
+}
+.list li.ticked span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.week {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.week li {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+.week li.today {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.week .d {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--muted);
+}
+.week li.today .d { color: var(--ink); }
+.week .a { font-weight: 500; }
+.pill {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.pill.done { background: var(--done-soft); color: var(--done); }
+.pill.now { background: var(--accent); color: var(--accent-ink); }
+.pill.missed { border: 1px solid var(--line); color: var(--muted); }
+.pill.later { color: var(--muted); }
+
+.hint {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--muted);
+  border-radius: 12px;
+  font-size: 14px;
+}
+.hint[hidden] { display: none; }
+.foot {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+</style>
+</head>
+<body>
+<main>
+  <p class="hint" id="install-hint" hidden>Appként: Safari alján a Megosztás gomb, majd „Főképernyőhöz adás”.</p>
+  <header class="top">
+    <div>
+      <p class="date" id="date-line">Ma</p>
+      <h1 id="area-name">Lakásrend</h1>
+    </div>
+    <div class="streak" aria-live="polite">
+      <b id="streak-num">0</b>
+      <span>nap sorozat</span>
+    </div>
+  </header>
+
+  <div class="timer">
+    <div class="timer-row">
+      <div class="clock" id="clock" role="timer" aria-live="off">15:00</div>
+      <p class="timer-note" id="timer-note">Ennyi az egész mára.</p>
+    </div>
+    <div class="bar" aria-hidden="true"><i id="bar-fill"></i></div>
+    <div class="timer-actions">
+      <button type="button" class="btn-main" id="btn-start">15 perc indítása</button>
+      <button type="button" class="btn-quiet" id="btn-reset">Nulláz</button>
+    </div>
+  </div>
+
+  <section aria-labelledby="h-today">
+    <h2 id="h-today">Mai 15 perc</h2>
+    <ul class="list" id="today-list"></ul>
+  </section>
+
+  <section aria-labelledby="h-base">
+    <h2 id="h-base">Alap minden nap, 2 perc</h2>
+    <ul class="list" id="base-list"></ul>
+  </section>
+
+  <section aria-labelledby="h-week">
+    <h2 id="h-week">Ez a hét</h2>
+    <ul class="week" id="week-list"></ul>
+  </section>
+
+  <p class="foot">A pipák ezen a telefonon maradnak meg. Az emlékeztető minden nap 18:12-kor jön.</p>
+</main>
+
+<script>
+// Index = Date.getDay(): 0 vasárnap … 6 szombat
+var ROTA = [
+  { day: "vasárnap",  short: "V",   area: "Heti zárás", tasks: ["Felmosás", "Zuhany vagy kád átmosása", "Szelektív és szemét levitele"] },
+  { day: "hétfő",     short: "H",   area: "Konyha",     tasks: ["Pult és tűzhely letörlése", "Mosogató kisúrolása", "Szemét levitele"] },
+  { day: "kedd",      short: "K",   area: "Fürdő",      tasks: ["Mosdó és csap", "Tükör", "WC kívül-belül"] },
+  { day: "szerda",    short: "Sze", area: "Padló",      tasks: ["Porszívózás az egész lakásban", "Sarkok és az ágy alja", "Lábtörlő kirázása"] },
+  { day: "csütörtök", short: "Cs",  area: "Ruhák",      tasks: ["Mosás indítása", "Száraz ruhák elpakolása", "Szennyes összeszedése"] },
+  { day: "péntek",    short: "P",   area: "Felületek",  tasks: ["Portörlés polcokon és asztalon", "Íróasztal rendberakása", "Kábelek, apróságok a helyükre"] },
+  { day: "szombat",   short: "Szo", area: "Ágy és hűtő", tasks: ["Ágyneműcsere", "Hűtő átnézése, lejárt étel ki", "Törölközők cseréje"] }
+];
+var BASE = ["Mosogatás", "Ágy beágyazása", "Ruhák a helyükre"];
+var MONTHS = ["január", "február", "március", "április", "május", "június", "július", "augusztus", "szeptember", "október", "november", "december"];
+var KEY = "lakasrend-v1";
+var TOTAL = 15 * 60;
+
+var state = { days: {} };
+try {
+  var raw = JSON.parse(localStorage.getItem(KEY));
+  if (raw && raw.days) state = raw;
+} catch (e) {}
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+}
+function keyOf(d) {
+  var m = d.getMonth() + 1, day = d.getDate();
+  return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+}
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function addDays(d, n) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+function record(key) {
+  if (!state.days[key]) state.days[key] = { t: [false, false, false], b: [false, false, false] };
+  return state.days[key];
+}
+function isDone(key) {
+  var r = state.days[key];
+  return !!(r && r.t && r.t.length === 3 && r.t[0] && r.t[1] && r.t[2]);
+}
+function streak(today) {
+  var d = today, n = 0;
+  if (!isDone(keyOf(d))) d = addDays(d, -1);
+  while (isDone(keyOf(d))) { n++; d = addDays(d, -1); }
+  return n;
+}
+
+var shownKey = "";
+
+function buildList(ul, items, values, prefix) {
+  ul.textContent = "";
+  items.forEach(function (text, i) {
+    var li = document.createElement("li");
+    var label = document.createElement("label");
+    var box = document.createElement("input");
+    var span = document.createElement("span");
+    box.type = "checkbox";
+    box.id = prefix + "-" + i;
+    box.checked = !!values[i];
+    span.textContent = text;
+    if (box.checked) li.className = "ticked";
+    box.addEventListener("change", function () {
+      values[i] = box.checked;
+      li.className = box.checked ? "ticked" : "";
+      save();
+      renderStatus();
+    });
+    label.appendChild(box);
+    label.appendChild(span);
+    li.appendChild(label);
+    ul.appendChild(li);
+  });
+}
+
+function renderStatus() {
+  var today = startOfDay(new Date());
+  var todayKey = keyOf(today);
+  document.getElementById("streak-num").textContent = streak(today);
+
+  var ul = document.getElementById("week-list");
+  ul.textContent = "";
+  var monday = addDays(today, -((today.getDay() + 6) % 7));
+  for (var i = 0; i < 7; i++) {
+    var d = addDays(monday, i);
+    var k = keyOf(d);
+    var r = ROTA[d.getDay()];
+    var li = document.createElement("li");
+    var dEl = document.createElement("span");
+    var aEl = document.createElement("span");
+    var pill = document.createElement("span");
+    dEl.className = "d";
+    dEl.textContent = r.short;
+    aEl.className = "a";
+    aEl.textContent = r.area;
+    var cls, text;
+    if (isDone(k)) { cls = "done"; text = "Kész"; }
+    else if (k === todayKey) { cls = "now"; text = "Ma"; }
+    else if (d < today) { cls = "missed"; text = "Kimaradt"; }
+    else { cls = "later"; text = "Hátravan"; }
+    pill.className = "pill " + cls;
+    pill.textContent = text;
+    if (k === todayKey) li.className = "today";
+    li.appendChild(dEl);
+    li.appendChild(aEl);
+    li.appendChild(pill);
+    ul.appendChild(li);
+  }
+}
+
+function renderDay() {
+  var today = startOfDay(new Date());
+  var k = keyOf(today);
+  shownKey = k;
+  var r = ROTA[today.getDay()];
+  var rec = record(k);
+  document.getElementById("date-line").textContent =
+    "Ma, " + MONTHS[today.getMonth()] + " " + today.getDate() + "., " + r.day;
+  document.getElementById("area-name").textContent = r.area;
+  buildList(document.getElementById("today-list"), r.tasks, rec.t, "task");
+  buildList(document.getElementById("base-list"), BASE, rec.b, "base");
+  renderStatus();
+}
+
+// 15 perces visszaszámláló
+var remaining = TOTAL, endAt = 0, ticker = null;
+var clockEl = document.getElementById("clock");
+var barEl = document.getElementById("bar-fill");
+var noteEl = document.getElementById("timer-note");
+var startBtn = document.getElementById("btn-start");
+
+function paintTimer() {
+  var m = Math.floor(remaining / 60), s = remaining % 60;
+  clockEl.textContent = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  barEl.style.width = ((TOTAL - remaining) / TOTAL * 100) + "%";
+}
+function stopTicker() {
+  if (ticker) { clearInterval(ticker); ticker = null; }
+}
+function tick() {
+  remaining = Math.max(0, Math.round((endAt - Date.now()) / 1000));
+  paintTimer();
+  if (remaining === 0) {
+    stopTicker();
+    startBtn.textContent = "Újra 15 perc";
+    noteEl.textContent = "Letelt. Abbahagyhatod.";
+  }
+}
+startBtn.addEventListener("click", function () {
+  if (ticker) {
+    stopTicker();
+    startBtn.textContent = "Folytatás";
+    noteEl.textContent = "Szünetel.";
+    return;
+  }
+  if (remaining === 0) remaining = TOTAL;
+  endAt = Date.now() + remaining * 1000;
+  ticker = setInterval(tick, 250);
+  startBtn.textContent = "Szünet";
+  noteEl.textContent = "Megy az óra.";
+  tick();
+});
+document.getElementById("btn-reset").addEventListener("click", function () {
+  stopTicker();
+  remaining = TOTAL;
+  startBtn.textContent = "15 perc indítása";
+  noteEl.textContent = "Ennyi az egész mára.";
+  paintTimer();
+});
+
+document.addEventListener("visibilitychange", function () {
+  if (document.hidden) return;
+  if (keyOf(new Date()) !== shownKey) renderDay();
+  if (ticker) tick();
+});
+
+renderDay();
+paintTimer();
+
+// Telepítési tipp csak böngészőben, főképernyőről indítva nem
+var standalone = window.navigator.standalone === true ||
+  (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+if (!standalone) document.getElementById("install-hint").hidden = false;
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(function () {});
+}
+</script>
+</body>
+</html>
